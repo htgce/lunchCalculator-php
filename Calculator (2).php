@@ -17,8 +17,6 @@ $lines = [
 $Calculator = new Calculator($lines);
 $Calculator->printBill();
 
-//print_r($lines) ;
-
 class Calculator{
 
 	private $bills = [];
@@ -28,7 +26,6 @@ class Calculator{
 
 			$this->bills[] = new BillItem($bill_item);
 		}
-	//	print_r($this->bills); ;
 	}
 
 	public function printBill(){
@@ -49,113 +46,85 @@ class Calculator{
     private function calculate()
     {
         // Implement me!
-				 $resultMatrix = ["thijs" => [], "danny" => [], "stefan" => [], "den" => []];
+				 $resultMatrix = ['thijs' => [], 'danny' => [], 'stefan' => [], 'den' => []];
          $filteredResultMatrix = [];
 				 $lessTransactionResultMatrix = [];
-				 		foreach($this->bills as $bill_item){
-							$sizeOfAttendees = sizeof($bill_item->attendees);
-							$amountToPay = $bill_item -> price / $sizeOfAttendees;
-							foreach ( $bill_item->attendees as $key => $value) {
-								$toWhom = $bill_item -> paid_by;
-								if($toWhom != $value){
-									$currentDebtOfToWhom = $resultMatrix[$toWhom][$value];
-									if($currentDebtOfToWhom > 0){
-										if($amountToPay < $currentDebtOfToWhom){
-											$resultMatrix[$value][$toWhom] = 0;
-											$resultMatrix[$toWhom][$value] = $currentDebtOfToWhom - $amountToPay;
-										}else{
-											$resultMatrix[$toWhom][$value] = 0;
-											$resultMatrix[$value][$toWhom] = $amountToPay - $currentDebtOfToWhom;
-										}
-									}else{
-											$resultMatrix[$value][$toWhom] += $amountToPay;
-									}
-								}
-							}
-						}
-						foreach ($resultMatrix as $key => $value) {
-							$filteredResultMatrix[$key] = array_filter($value, function ($var) {
-							    return  $var != 0.00 ||  $var != 0;
-							});
-					}
 
-					foreach ($filteredResultMatrix as $key => $value) {
-						//echo "current key $key";
-						// key :stefan
-						// value : this, danny, den
-						if(is_array($value) && sizeof($value) > 0){
-							foreach ($value as $internalKey => $internalValue) {
-								//$internalKey : this
-								//$internalValue :
-								//this kime borclu
-								if(is_array($filteredResultMatrix[$internalKey]) && sizeof($filteredResultMatrix[$internalKey]) > 0){
-											$whomToOweWhoIOwe = $this->findWhomToOweForASpecificPeople($filteredResultMatrix,$internalKey);
-											//stefanda bunlara borclu mu
-											if($key == "stefan" && $internalKey == "thijs"){
-												//print_r($whomToOweWhoIOwe);
-											  foreach ($whomToOweWhoIOwe as $peopleIndex => $peopleNameValue) {
-													//print_r($peopleNameValue);
-
-													foreach ($peopleNameValue as $peopleNameWhomToOweByIOwe => $valueOfOweByIOwe) {
-														// code... danny ->45
-														//dannye ben de borclu muyum
-														//print_r($value);
-														$filterArray [] =$peopleNameWhomToOweByIOwe;
-														$filtered = array_filter($value,  function ($key) use ($filterArray) {  return in_array($key, $filterArray);},
-														ARRAY_FILTER_USE_KEY
-													);
-													  //echo "$peopleNameWhomToOweByIOwe";
-														//print_r($filtered);
-														if(sizeof($filtered) > 0 ) {
-															//echo $peopleNameWhomToOweByIOwe; //danny
-															//stefanın thise borcunun miktarı
-															 $amountOfIOwe = $this->howMuchIOwe($filteredResultMatrix, $key,$internalKey); //stefan-this
-															 $amountOfOweOfIOwe = $this->howMuchIOwe($filteredResultMatrix,$internalKey,$peopleNameWhomToOweByIOwe); //this-danny
-															 $amountOfOweOfMeToAllWeOwe = $this->howMuchIOwe($filteredResultMatrix,$key,$peopleNameWhomToOweByIOwe);//stefan-danny
-															echo "Amounts : ";
-															echo "$amountOfIOwe , $amountOfOweOfIOwe, $amountOfOweOfMeToAllWeOwe  ";
-															if($amountOfIOwe > $amountOfOweOfIOwe){
-																$filteredResultMatrix[$internalKey][$peopleNameWhomToOweByIOwe] = 0;
-																$filteredResultMatrix[$key][$internalKey] = $amountOfIOwe - $amountOfOweOfIOwe;
-																$filteredResultMatrix[$key][$peopleNameWhomToOweByIOwe] = $amountOfOweOfMeToAllWeOwe +  $amountOfIOwe;
-																
-															}else{
-
-															}
-
-														}
-													}
-
-											  }
-											}
-										}
-								}
-							}
-						}
-
-						echo 		"Result".PHP_EOL;
-					  //print_r($filteredResultMatrix);
-
-						//return $filteredResultMatrix;
+					$resultMatrix = $this->doSharingAmoungParticipant($resultMatrix);
+          $lessTransactionResultMatrix = $this->eliminateUnnecessaryTransaction($resultMatrix);
+					print_r($resultMatrix);
+					return $lessTransactionResultMatrix;
 	}
 
+  private function eliminateUnnecessaryTransaction($filteredResultMatrix){
+				foreach ($filteredResultMatrix as $currentPersonName => $whomCurrentPersonOwe) {
+					if(is_array($whomCurrentPersonOwe) && sizeof($whomCurrentPersonOwe) > 0){
+						foreach ($whomCurrentPersonOwe as $thePersonNameWhoCurrentPersonOwe => $valueOfOweCurrentPersonToThePerson) {
+							if(is_array($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) && sizeof($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) > 0){
+                     $peopleWhoCurrentPersonIOweOweTo = $filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe];
+										 $whomToIOwe = $this->findWhomToOweForASpecificPeople($filteredResultMatrix,$currentPersonName);
+										 $findPeopleBothOfUsOweTo = array_intersect_key($whomToIOwe, $peopleWhoCurrentPersonIOweOweTo);
+										 if(sizeof($findPeopleBothOfUsOweTo) > 0){
+										  $filteredResultMatrix = $this->eliminateTransactionBetweenThree($filteredResultMatrix,$currentPersonName,$thePersonNameWhoCurrentPersonOwe,$findPeopleBothOfUsOweTo);
+										 }
+							}
+						}
+					}
+		 }
+	    return $filteredResultMatrix;
 
-		private function findWhoOweToASpecificPeople($matrixToBeSearched, $peopleName){
-      $filteredMatrixBySpecificPeople =[];
-			foreach ($matrixToBeSearched as $key => $value) {
-				foreach ($value as $name => $val) {
-					if($name == $peopleName){
-						$filteredMatrixBySpecificPeople[] = $key;
+  }
+
+	private function doSharingAmoungParticipant($resultMatrix){
+			foreach($this->bills as $bill_item){
+				$sizeOfAttendees = sizeof($bill_item->attendees);
+				$amountToPay = $bill_item -> price / $sizeOfAttendees;
+				foreach ( $bill_item->attendees as $key => $value) {
+					$toWhom = $bill_item -> paid_by;
+					if($toWhom != $value){
+						$currentDebtOfToWhom = $resultMatrix[$toWhom][$value];
+						if($currentDebtOfToWhom > 0){
+							if($amountToPay < $currentDebtOfToWhom){
+								unset($resultMatrix[$value][$toWhom]);
+								$resultMatrix[$toWhom][$value] = $currentDebtOfToWhom - $amountToPay;
+							}else{
+								unset($resultMatrix[$toWhom][$value]);
+								$resultMatrix[$value][$toWhom] = $amountToPay - $currentDebtOfToWhom;
+							}
+						}else{
+							 $resultMatrix[$value][$toWhom] += $amountToPay;
+						}
 					}
 				}
 			}
-			return $filteredMatrixBySpecificPeople;
+			return $resultMatrix;
 		}
 
+		private function eliminateTransactionBetweenThree($filteredResultMatrix,$currentPersonName,$thePersonNameWhoCurrentPersonOwe,$findPeopleBothOfUsOweTo){
+			$peopleNameArray = array_keys($findPeopleBothOfUsOweTo);
+
+			foreach ($peopleNameArray as $name) {
+
+				$amountOfIOwe = $this->howMuchIOwe($filteredResultMatrix, $currentPersonName,$thePersonNameWhoCurrentPersonOwe);
+				if($amountOfIOwe > 0){
+				$amountOfOweOfIOwe = $this->howMuchIOwe($filteredResultMatrix,$thePersonNameWhoCurrentPersonOwe,$name);
+				$amountOfMe = $this->howMuchIOwe($filteredResultMatrix,$currentPersonName,$name);
+				if($amountOfIOwe > $amountOfOweOfIOwe){
+								unset($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name]);
+								$filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe] = $amountOfIOwe - $amountOfOweOfIOwe;
+								$filteredResultMatrix[$currentPersonName][$name] = $amountOfMe +  $amountOfOweOfIOwe;
+				}else{
+					$filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name] =  $amountOfOweOfIOwe - $amountOfIOwe;
+					unset($filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe]);
+					$filteredResultMatrix[$currentPersonName][$name] = $amountOfMe + $amountOfIOwe;
+			}
+		 }
+		}
+		return $filteredResultMatrix;
+	}
+
 		private function findWhomToOweForASpecificPeople($matrixToBeSearched, $peopleName){
-			$filteredMatrixBySpecificPeople =[];
-			$filteredMatrixBySpecificPeople[] = $matrixToBeSearched[$peopleName];
-			return $filteredMatrixBySpecificPeople;
+			return $matrixToBeSearched[$peopleName];
 		}
 
 		private function howMuchIOwe($matrix, $nameOfDebtor, $nameOfIOwe){
@@ -179,7 +148,6 @@ class BillItem{
 		foreach(explode(',', $data[2]) as $debtor){
 			$this->attendees[] = strtolower($debtor);
 		}
-		//print_r($this->attendees);
 
 	}
 }
