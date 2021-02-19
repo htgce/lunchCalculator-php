@@ -46,34 +46,72 @@ class Calculator{
     private function calculate()
     {
         // Implement me!
-				 $resultMatrix = ['thijs' => [], 'danny' => [], 'stefan' => [], 'den' => []];
-         $filteredResultMatrix = [];
-				 $lessTransactionResultMatrix = [];
+		 $resultMatrix = ['thijs' => [], 'danny' => [], 'stefan' => [], 'den' => []]; // debtMatrix
+		 $lessTransactionResultMatrix = []; // optimizedMatrix
 
-					$resultMatrix = $this->doSharingAmoungParticipant($resultMatrix);
-          $lessTransactionResultMatrix = $this->eliminateUnnecessaryTransaction($resultMatrix);
-					print_r($resultMatrix);
-					return $lessTransactionResultMatrix;
+		 $resultMatrix = $this->doSharingAmoungParticipant($resultMatrix); // calculateDebts
+     $lessTransactionResultMatrix = $this->eliminateUnnecessaryTransaction($resultMatrix); // optimizeTransactions
+     //print_r($resultMatrix);
+
+		 return $lessTransactionResultMatrix;
 	}
 
-  private function eliminateUnnecessaryTransaction($filteredResultMatrix){
-				foreach ($filteredResultMatrix as $currentPersonName => $whomCurrentPersonOwe) {
-					if(is_array($whomCurrentPersonOwe) && sizeof($whomCurrentPersonOwe) > 0){
-						foreach ($whomCurrentPersonOwe as $thePersonNameWhoCurrentPersonOwe => $valueOfOweCurrentPersonToThePerson) {
-							if(is_array($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) && sizeof($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) > 0){
-                     $peopleWhoCurrentPersonIOweOweTo = $filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe];
-										 $whomToIOwe = $this->findWhomToOweForASpecificPeople($filteredResultMatrix,$currentPersonName);
-										 $findPeopleBothOfUsOweTo = array_intersect_key($whomToIOwe, $peopleWhoCurrentPersonIOweOweTo);
-										 if(sizeof($findPeopleBothOfUsOweTo) > 0){
-										  $filteredResultMatrix = $this->eliminateTransactionBetweenThree($filteredResultMatrix,$currentPersonName,$thePersonNameWhoCurrentPersonOwe,$findPeopleBothOfUsOweTo);
-										 }
-							}
+private function eliminateUnnecessaryTransaction($filteredResultMatrix){ // optimizeTransactions
+		foreach ($filteredResultMatrix as $currentPersonName => $whomCurrentPersonOwe) {
+			if(is_array($whomCurrentPersonOwe) && sizeof($whomCurrentPersonOwe) > 0){
+				foreach ($whomCurrentPersonOwe as $thePersonNameWhoCurrentPersonOwe => $valueOfOweCurrentPersonToThePerson) {
+					if(is_array($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) && sizeof($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe]) > 0){
+							$peopleWhoCurrentPersonIOweOweTo = $filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe];
+							$whomToIOwe = $this->findWhomToOweForASpecificPeople($filteredResultMatrix,$currentPersonName);
+							$findPeopleBothOfUsOweTo = array_intersect_key($whomToIOwe, $peopleWhoCurrentPersonIOweOweTo);
+						 if(sizeof($findPeopleBothOfUsOweTo) > 0){
+						 	$filteredResultMatrix = $this->eliminateTransactionBetweenThree($filteredResultMatrix,$currentPersonName,$thePersonNameWhoCurrentPersonOwe,$findPeopleBothOfUsOweTo);
 						}
 					}
-		 }
-	    return $filteredResultMatrix;
+				}
+			}
+     }
+			$filteredResultMatrix = $this->eliminateMoreIfNeeded($filteredResultMatrix);
+			return $filteredResultMatrix;
 
   }
+
+	private function eliminateMoreIfNeeded($filteredResultMatrix){ // reorderTransactions
+		$listOfPeopleWhoHasTransaction = array_filter($filteredResultMatrix, function($v, $k) {
+    return  sizeof($v) > 0;}, ARRAY_FILTER_USE_BOTH);
+    $listOfPeopleToCompare  = array_keys($listOfPeopleWhoHasTransaction);
+
+    $peopleNameWhoHasTheMaxNumTransaction = $this->findPeopleWhoTheMaxTransaction($filteredResultMatrix,$listOfPeopleToCompare);
+		$listOfPeopleToCompare = array_filter($listOfPeopleToCompare, function($v, $k) {return  $k != $peopleNameWhoHasTheMaxNumTransaction;}, ARRAY_FILTER_USE_BOTH);
+
+		$listOfPeopleWhoMakTransactionOweTo = $filteredResultMatrix[$peopleNameWhoHasTheMaxNumTransaction];
+
+		foreach ($listOfPeopleToCompare as $peopleNameWhoHasTransaction) {
+			$findPeopleBothOfUsOweTo = array_intersect_key($filteredResultMatrix[$peopleNameWhoHasTransaction], $listOfPeopleWhoMakTransactionOweTo);
+			foreach ($findPeopleBothOfUsOweTo as $peopleNameWeBothOweTo => $value) {
+				$howMuchMaxTransactionOwe = $this->howMuchIOwe($filteredResultMatrix, $peopleNameWhoHasTheMaxNumTransaction, $peopleNameWeBothOweTo);
+				$filteredResultMatrix[$peopleNameWhoHasTheMaxNumTransaction][$peopleNameWeBothOweTo] = 	$howMuchMaxTransactionOwe + 	$value ;
+				$filteredResultMatrix[$peopleNameWhoHasTransaction][$peopleNameWhoHasTheMaxNumTransaction] += $value;
+				unset(	$filteredResultMatrix[$peopleNameWhoHasTransaction][$peopleNameWeBothOweTo]);
+			}
+
+		}
+    return $filteredResultMatrix;
+	}
+
+
+	private function findPeopleWhoTheMaxTransaction($filteredResultMatrix, $listOfPeopleToCompare){
+    $countOfTransaction = 0;
+		foreach ($listOfPeopleToCompare as $peopleName) {
+			$transactionsForThisPeople = $filteredResultMatrix[$peopleName];
+			$sizeOfTransactions = sizeof($transactionsForThisPeople) ;
+			if($sizeOfTransactions > $countOfTransaction){
+				$peopleNameWhoHasTheMaxNumTransaction = $peopleName;
+				$countOfTransaction = $sizeOfTransactions;
+			}
+		}
+		return $peopleNameWhoHasTheMaxNumTransaction;
+	}
 
 	private function doSharingAmoungParticipant($resultMatrix){
 			foreach($this->bills as $bill_item){
@@ -102,28 +140,27 @@ class Calculator{
 
 		private function eliminateTransactionBetweenThree($filteredResultMatrix,$currentPersonName,$thePersonNameWhoCurrentPersonOwe,$findPeopleBothOfUsOweTo){
 			$peopleNameArray = array_keys($findPeopleBothOfUsOweTo);
-
 			foreach ($peopleNameArray as $name) {
 
 				$amountOfIOwe = $this->howMuchIOwe($filteredResultMatrix, $currentPersonName,$thePersonNameWhoCurrentPersonOwe);
-				if($amountOfIOwe > 0){
-				$amountOfOweOfIOwe = $this->howMuchIOwe($filteredResultMatrix,$thePersonNameWhoCurrentPersonOwe,$name);
-				$amountOfMe = $this->howMuchIOwe($filteredResultMatrix,$currentPersonName,$name);
-				if($amountOfIOwe > $amountOfOweOfIOwe){
-								unset($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name]);
-								$filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe] = $amountOfIOwe - $amountOfOweOfIOwe;
-								$filteredResultMatrix[$currentPersonName][$name] = $amountOfMe +  $amountOfOweOfIOwe;
-				}else{
-					$filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name] =  $amountOfOweOfIOwe - $amountOfIOwe;
-					unset($filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe]);
-					$filteredResultMatrix[$currentPersonName][$name] = $amountOfMe + $amountOfIOwe;
-			}
-		 }
-		}
+					if($amountOfIOwe > 0){
+					$amountOfOweOfIOwe = $this->howMuchIOwe($filteredResultMatrix,$thePersonNameWhoCurrentPersonOwe,$name);
+					$amountOfMe = $this->howMuchIOwe($filteredResultMatrix,$currentPersonName,$name);
+						if($amountOfIOwe > $amountOfOweOfIOwe){
+						  unset($filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name]);
+						  $filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe] = $amountOfIOwe - $amountOfOweOfIOwe;
+						  $filteredResultMatrix[$currentPersonName][$name] = $amountOfMe +  $amountOfOweOfIOwe;
+						}else{
+						  $filteredResultMatrix[$thePersonNameWhoCurrentPersonOwe][$name] =  $amountOfOweOfIOwe - $amountOfIOwe;
+						  unset($filteredResultMatrix[$currentPersonName][$thePersonNameWhoCurrentPersonOwe]);
+						  $filteredResultMatrix[$currentPersonName][$name] = $amountOfMe + $amountOfIOwe;
+					 }
+			    }
+	 	 }
 		return $filteredResultMatrix;
 	}
 
-		private function findWhomToOweForASpecificPeople($matrixToBeSearched, $peopleName){
+		private function findWhomToOweForASpecificPeople($matrixToBeSearched, $peopleName){ // findPeopleIOwe
 			return $matrixToBeSearched[$peopleName];
 		}
 
